@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Globe Visualization</title>
+  <!-- Link to the external CSS file -->
+  <link rel="stylesheet" href="styles.css">
+  <!-- Importing D3 and Globe.gl libraries -->
+  <script src="//unpkg.com/d3"></script>
+  <script src="//unpkg.com/globe.gl"></script>
+</head>
+<body>
+  <!-- Search bar and slider container -->
+  <div id="searchContainer">
+    <!-- Search bar section -->
+    <div id="searchBarContainer">
+      <input type="text" id="searchBar" placeholder="Search">
+      <button id="searchButton">OK</button>
+    </div>
+    <!-- Slider section for selecting the number of results -->
+    <div id="sliderContainer">
+      <input type="range" id="resultSlider" min="1" max="20" value="10">
+      <div id="numResults">10</div>
+    </div>
+  </div>
+  <!-- Container for the globe visualization -->
+  <div id="globeViz"></div>
+
+  <script type="module">
+    // Importing Three.js
+    import * as THREE from '//unpkg.com/three/build/three.module.js';
+
+    // Setting up a color scale for the globe
+    const colorScale = d3.scaleSequentialSqrt(d3.interpolateYlOrRd);
+
+    // Function to get the value used for coloring each country
+    const getVal = feat => feat.properties.GDP_MD_EST / Math.max(1e5, feat.properties.POP_EST);
+
+    // Fetching the GeoJSON data for the countries
+    fetch('./datasets/ne_110m_admin_0_countries.geojson').then(res => res.json()).then(countries => {
+      const maxVal = Math.max(...countries.features.map(getVal));
+      colorScale.domain([0, maxVal]);
+
+      // Setting up the globe visualization
+      const world = Globe()
+        .globeImageUrl('//unpkg.com/three-globe/example/img/earth-night.jpg')
+        .backgroundImageUrl('//unpkg.com/three-globe/example/img/night-sky.png')
+        .lineHoverPrecision(0)
+        .polygonsData(countries.features.filter(d => d.properties.ISO_A2 !== 'AQ'))
+        .polygonAltitude(0.06)
+        .polygonCapColor(() => 'grey')
+        .polygonSideColor(() => 'rgba(0, 100, 0, 0.15)')
+        .polygonStrokeColor(() => '#111')
+        .polygonLabel(({ properties: d }) => `${d.ADMIN}`)
+        .onPolygonHover(hoverD => world
+          .polygonAltitude(d => d === hoverD ? 0.12 : 0.06)
+          .polygonCapColor(d => d === hoverD ? 'steelblue' : 'grey')
+        )
+        .polygonsTransitionDuration(300)
+        (document.getElementById('globeViz'));
+
+      // Enable auto-rotation of the globe
+      world.controls().autoRotate = true;
+      world.controls().autoRotateSpeed = 0.25;
+
+      // Adjust the globe size when the window is resized
+      window.addEventListener('resize', () => {
+        world
+          .width(window.innerWidth)
+          .height(window.innerHeight);
+      });
+
+      // Function to handle the search input
+      const handleSearch = () => {
+        const searchBar = document.getElementById('searchBar');
+        const searchTerm = searchBar.value.toLowerCase();
+        const numResults = document.getElementById('resultSlider').value;
+        console.log('Search input:', searchTerm, 'Number of results:', numResults);
+
+        // Sending a POST request to the Flask backend with the search query and number of results
+        fetch('http://127.0.0.1:5000/search', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ query: searchTerm, num_results: numResults })
+        })
+          .then(response => response.json())
+          .then(data => {
+            const relatedCountries = data.related_countries || [];
+            console.log('Related countries:', relatedCountries);
+
+            // Update the color of the countries based on the search results
+            world.polygonCapColor(feat => relatedCountries.includes(feat.properties.ADMIN) ? 'steelblue' : 'grey');
+            world.polygonsTransitionDuration(300);
+          })
+          .catch(error => console.error('Error:', error));
+
+        // Clear the search bar
+        searchBar.value = '';
+
+        // Temporarily change the button color to grey
+        const searchButton = document.getElementById('searchButton');
+        searchButton.style.backgroundColor = 'grey';
+        
+        // Restore the original color after 0.5 seconds
+        setTimeout(() => {
+          searchButton.style.backgroundColor = '#4CAF50';
+        }, 500);
+      };
+
+      // Event listeners for the search button and the Enter key press in the search bar
+      document.getElementById('searchButton').addEventListener('click', handleSearch);
+      document.getElementById('searchBar').addEventListener('keypress', event => {
+        if (event.key === 'Enter') {
+          handleSearch();
+        }
+      });
+
+      // Event listener for the slider to update the number of results
+      document.getElementById('resultSlider').addEventListener('input', event => {
+        document.getElementById('numResults').textContent = event.target.value;
+      });
+    });
+  </script>
+</body>
+</html>
