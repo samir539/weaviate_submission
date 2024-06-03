@@ -80,7 +80,7 @@ The Globe Visualization Project is an interactive web application that visualize
 - `index.html`: The main HTML file for the frontend.
 - `styles.css`: The CSS file for styling the frontend.
 - `app.py`: The Flask backend file.
-- `requirements.txt`: The list of Python dependencies.
+- `pyproject.toml`: The list of Python dependencies.
 
 ## Dependencies
 
