@@ -33,12 +33,12 @@ def search():
         return jsonify({"error": "No query provided"}), 400
 
     response = client.query \
-        .get("DetailedCountry22", ["country"]) \
+        .get("DetailedCountry_2", ["country"]) \
         .with_near_text({"concepts": [query]}) \
         .with_limit(num_results) \
         .do()
 
-    countries = [res['country'] for res in response['data']['Get']['DetailedCountry22']]
+    countries = [res['country'] for res in response['data']['Get']['DetailedCountry_2']]
 
     return jsonify({"related_countries": countries})
 
